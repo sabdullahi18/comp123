@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-from skyfield.api import load
+from skyfield.api import load, wgs84
 from scipy.spatial.distance import pdist, squareform
 
 TLE_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle"
@@ -15,7 +15,25 @@ def fetch_satellite_data():
     print("Fetching TLE data from CelesTrak...")
     satellites = load.tle_file(TLE_URL)
     print(f"Total satellites found: {len(satellites)}")
-    subset = satellites[:MAX_NODES]
+
+    ts = load.timescale()
+    t_now = ts.now()
+    subset = []
+
+    for sat in satellites:
+        try:
+            geocentric = sat.at(t_now)
+            subpoint = wgs84.subpoint(geocentric)
+            height_km = subpoint.elevation.km
+
+            if 530 < height_km < 580:
+                subset.append(sat)
+        except Exception as _:
+            continue
+
+        if len(subset) >= MAX_NODES:
+            break
+
     print(f"Selected {len(subset)} satellites for analysis")
     return subset
 
