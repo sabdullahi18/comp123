@@ -99,3 +99,64 @@ plt.grid(alpha=0.3)
 plt.savefig("graph.png", dpi=300)
 
 print("Graph is ready in graph.png")
+
+history_avg_path = []
+history_clustering = []
+history_assortativity = []
+time_steps = []
+
+print(f"Analysing topology over {DURATION_MINUTES} minutes...")
+
+for t, G in enumerate("gp.php"):
+    if nx.is_connected(G):
+        G_gc = G
+    else:
+        gc_nodes = max(nx.connected_components(G), key=len)
+        G_gc = G.subgraph(gc_nodes).copy()
+
+    try:
+        length = nx.average_shortest_path_length(G_gc)
+    except Exception as _:
+        length = 0
+
+    history_avg_path.append(length)
+
+    c = nx.average_clustering(G)
+    history_clustering.append(c)
+
+    r = nx.degree_associativity_coefficient(G)
+    history_assortativity.append(r)
+
+    time_steps.append(t)
+
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
+ax1.plot(time_steps, history_avg_path, color="purple", linewidth=2)
+ax1.set_ylabel("Avg Path Length (Hops)")
+ax1.set_title("Metric 1: Network Efficiency (Latency)")
+ax1.grid(True, alpha=0.3)
+
+# Plot 2: Robustness (Clustering)
+ax2.plot(time_steps, history_clustering, color="orange", linewidth=2)
+ax2.set_ylabel("Avg Clustering Coeff")
+ax2.set_title("Metric 2: Local Robustness (Clustering)")
+ax2.grid(True, alpha=0.3)
+
+# Plot 3: Mixing Pattern (Assortativity)
+ax3.plot(time_steps, history_assortativity, color="teal", linewidth=2)
+ax3.axhline(0, color="black", linestyle="--", alpha=0.5)
+ax3.set_ylabel("Assortativity (r)")
+ax3.set_xlabel("Time (Minutes)")
+ax3.set_title("Metric 3: Mixing Pattern (Degree Correlation)")
+ax3.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+print("--- NETWORK CHARACTERIZATION ---")
+print(f"Avg Path Length: {np.mean(history_avg_path):.2f} hops (Expected for LEO: Low)")
+print(
+    f"Avg Clustering:  {np.mean(history_clustering):.2f} (Expected for Geometric Graph: High)"
+)
+print(
+    f"Avg Assortativity: {np.mean(history_assortativity):.2f} (Expected: Positive/Assortative)"
+)
