@@ -85,6 +85,7 @@ def calculate_basic_metrics(temporal_graphs):
         "assortativity": [],
         "time_steps": [],
         "rho": [],
+        "stability": [],
     }
 
     prev_rich_set = set()
@@ -132,6 +133,35 @@ def calculate_basic_metrics(temporal_graphs):
         history["time_steps"].append(t)
 
     return history
+
+
+def plot_degree_distribution(G):
+    degrees = [d for n, d in G.degree()]
+    avg_deg = np.mean(degrees)
+
+    plt.figure(figsize=(8, 6))
+    plt.hist(
+        degrees,
+        bins=range(int(min(degrees)), int(max(degrees)) + 2),
+        color="skyblue",
+        edgecolor="black",
+        rwidth=0.8,
+    )
+
+    plt.axvline(
+        avg_deg,
+        color="red",
+        linestyle="dashed",
+        linewidth=1,
+        label=f"Avg Degree: {avg_deg:.2f}",
+    )
+
+    plt.title(f"Degree Distribution at T=0 (N={len(G.nodes)})")
+    plt.xlabel("Degree (k)")
+    plt.ylabel("Frequency")
+    plt.grid(axis="y", alpha=0.3)
+    plt.savefig("degree_distribution", dpi=300)
+    print("Saved degree_distribution.png")
 
 
 def plot_results(results):
@@ -182,4 +212,5 @@ if __name__ == "__main__":
     sats = fetch_satellite_data()
     temporal_graphs = build_temporal_network(sats)
     results = calculate_basic_metrics(temporal_graphs)
+    plot_degree_distribution(temporal_graphs[0])
     plot_results(results)
