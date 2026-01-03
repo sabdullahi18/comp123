@@ -11,6 +11,7 @@ ALTITUDE_MIN = 530
 ALTITUDE_MAX = 580
 DURATION_MINUTES = 95
 TIME_STEP_MIN = 1
+RICH_CLUB_K = 10
 
 
 def fetch_satellite_data():
@@ -83,8 +84,10 @@ def calculate_basic_metrics(temporal_graphs):
         "clustering": [],
         "assortativity": [],
         "time_steps": [],
+        "rho": [],
     }
 
+    prev_rich_set = set()
     print("Calculating topological metrics...")
 
     for t, G in enumerate(temporal_graphs):
@@ -98,7 +101,31 @@ def calculate_basic_metrics(temporal_graphs):
 
         c = nx.average_clustering(G)
         r = nx.degree_assortativity_coefficient(G)
+        rc = nx.rich_club_coefficient(G, normalized=False)
+        phi_real = rc.get(RICH_CLUB_K, 0)
 
+        degrees = [d for n, d in G.degree()]
+        G_rand = nx.configuration_model(degrees)
+        G_rand = nx.Graph(G_rand)
+        G_rand.remove_edges_from(nx.selfloop_edges(G_rand))
+
+        rc_rand = nx.rich_club_coefficient(G_rand, normalized=False)
+        phi_rand = rc_rand.get(RICH_CLUB_K, 0)
+        rho = phi_real / phi_rand if phi_rand > 0 else 0
+
+        curr_rich_set = {n for n, d in G.degree() if d > RICH_CLUB_K}
+        if t == 0:
+            stab = 1.0
+        else:
+            if len(prev_rich_set) > 0 or len(curr_rich_set) > 0:
+                inter = len(prev_rich_set.intersection(curr_rich_set))
+                union = len(prev_rich_set.union(curr_rich_set))
+                stab = inter / union
+            else:
+                stab = 1.0
+
+        history["stability"].append(stab)
+        history["rho"].append(rho)
         history["path_length"].append(length)
         history["clustering"].append(c)
         history["assortativity"].append(r)
@@ -109,7 +136,7 @@ def calculate_basic_metrics(temporal_graphs):
 
 def plot_results(results):
     time = results["time_steps"]
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
+    fig1, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
     ax1.plot(time, results["path_length"], color="purple", linewidth=2)
     ax1.set_ylabel("Avg Path Length")
     ax1.set_title("Network Efficiency (Latency)")
@@ -130,6 +157,25 @@ def plot_results(results):
     plt.tight_layout()
     plt.savefig("basic_metrics.png", dpi=300)
     print("Saved basic_metrics.png")
+
+    fig2, (ax4, ax5) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    ax4.plot(time, results["rho"], color="#d62728", marker="o", markersize=3)
+    ax4.axhline(1.0, color="k", linestyle="--", label="Random Baseline")
+    ax4.set_ylabel(r"Norm. Rich-Club ($\rho$)")
+    ax4.set_title(f"Q1: Does the Rich Club Exist? (k > {RICH_CLUB_K})")
+    ax4.legend()
+    ax4.grid(alpha=0.3)
+
+    ax5.plot(time, results["stability"], color="#2ca02c", marker="s", markersize=3)
+    ax5.set_ylabel("Stability (Jaccard)")
+    ax5.set_xlabel("Time (Minutes)")
+    ax5.set_title("Q2: Do the same nodes stay Rich?")
+    ax5.set_ylim(0, 1.1)
+    ax5.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig("rich_club_results.png", dpi=300)
+    print("Saved rich_club_results.png")
 
 
 if __name__ == "__main__":
