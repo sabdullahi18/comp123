@@ -7,18 +7,32 @@ from scipy.spatial.distance import pdist, squareform
 from tqdm import tqdm
 
 
-TLE_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle"
-MAX_NODES = 750
-ISL_RANGE_KM = 1200
-ALTITUDE_MIN = 530
-ALTITUDE_MAX = 580
 DURATION_MINUTES = 95
 TIME_STEP_MIN = 1
 
+CONFIGS = {
+    "Starlink": {
+        "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",
+        "alt_min": 530,
+        "alt_max": 580,
+        "max_nodes": 10000,
+        "isl_range": 1200,
+        "color": "pink",
+    },
+    "OneWeb": {
+        "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=oneweb&FORMAT=tle",
+        "alt_min": 1150,
+        "alt_max": 1250,
+        "max_nodes": 10000,
+        "isl_range": 2500,
+        "color": "purple",
+    },
+}
 
-def fetch_satellite_data():
-    print("Fetching TLE data from CelesTrak...")
-    satellites = load.tle_file(TLE_URL)
+
+def fetch_satellite_data(config):
+    print(f"Fetching TLE data from {config['url']}...")
+    satellites = load.tle_file(config["url"], reload=True)
     print(f"Total satellites found: {len(satellites)}")
 
     ts = load.timescale()
@@ -31,12 +45,12 @@ def fetch_satellite_data():
             subpoint = wgs84.subpoint(geocentric)
             height_km = subpoint.elevation.km
 
-            if ALTITUDE_MIN < height_km < ALTITUDE_MAX:
+            if config["alt_min"] < height_km < config["alt_max"]:
                 subset.append(sat)
         except Exception as _:
             continue
 
-        if len(subset) >= MAX_NODES:
+        if len(subset) >= config["max_nodes"]:
             break
 
     print(f"Selected {len(subset)} satellites for analysis")
@@ -362,9 +376,7 @@ def export_to_gephi(G, satellites, t_now, filename="starlink_gephi.gexf"):
     print("Done! Gephi file saved.")
 
 
-def plot_interactive_globe_full(
-    G, satellites, t_now, filename="starlink_rich_club.html"
-):
+def plot_interactive_globe_full(G, satellites, t_now, filename):
     print(f"Generating 3D Network Globe: {filename}...")
     node_positions = {}
     node_degrees = []
@@ -455,9 +467,54 @@ def plot_interactive_globe_full(
 
 
 if __name__ == "__main__":
-    sats = fetch_satellite_data()
-    temporal_graphs = build_temporal_network(sats)
-    # results = calculate_basic_metrics(temporal_graphs)
-    # save_all_plots(temporal_graphs, results)
-    # export_to_gephi(temporal_graphs[0], sats, load.timescale().now())
-    plot_interactive_globe_full(temporal_graphs[0], sats, load.timescale().now())
+    all_results = {}
+    for name, conf in CONFIGS.items():
+        print(f"\n--- STARTING ANALYSIS FOR: {name} ---")
+        global ISL_RANGE_KM
+        ISL_RANGE_KM = conf["isl_range"]
+
+        sats = fetch_satellite_data(conf)
+        temporal_graphs = build_temporal_network(sats)
+        results = calculate_basic_metrics(temporal_graphs)
+        all_results[name] = results
+
+        ts = load.timescale()
+        export_to_gephi(
+            temporal_graphs[0], sats, ts.now(), filename=f"{name}-gephi.gexf"
+        )
+        plot_interactive_globe_full(
+            temporal_graphs[0], sats, ts.now(), filename=f"{name}-interactive.html"
+        )
+    print("\nGenerating Comparison Plots...")
+
+    plt.figure(figsize=(10, 6))
+    for name, res in all_results.items():
+        plt.plot(
+            res["time_steps"], res["rho"], label=name, color=CONFIGS[name]["color"]
+        )
+
+    plt.axhline(1.0, color="k", linestyle="--", label="Random Baseline")
+    plt.title("Comparative Rich-Club: Starlink vs OneWeb")
+    plt.ylabel(r"Normalised Rich-Club Coefficient ($\rho$)")
+    plt.xlabel("Time (min)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig("comparison_rho.png", dpi=300)
+
+    plt.figure(figsize=(10, 6))
+    for name, res in all_results.items():
+        plt.plot(
+            res["time_steps"],
+            res["stability"],
+            label=name,
+            color=CONFIGS[name]["color"],
+        )
+
+    plt.title("Comparative Stability: Starlink vs OneWeb")
+    plt.ylabel("Jaccard Stability Index")
+    plt.xlabel("Time (min)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig("comparison_stability.png", dpi=300)
+
+    print("Comparison plots saved!")
