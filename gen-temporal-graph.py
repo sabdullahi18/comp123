@@ -12,14 +12,14 @@ DURATION_MINUTES = 95
 TIME_STEP_MIN = 1
 
 CONFIGS = {
-    # "Starlink": {
-    #     "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",
-    #     "alt_min": 530,
-    #     "alt_max": 580,
-    #     "max_nodes": 10000,
-    #     "isl_range": 1200,
-    #     "color": "pink",
-    # },
+    "Starlink": {
+        "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",
+        "alt_min": 530,
+        "alt_max": 580,
+        "max_nodes": 10000,
+        "isl_range": 1200,
+        "color": "pink",
+    },
     "OneWeb": {
         "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=oneweb&FORMAT=tle",
         "alt_min": 1150,
@@ -212,89 +212,126 @@ def perform_latitude_analysis(G, satellites, t_mid, name):
     )
 
 
-def print_comprehensive_stats_table(all_results):
-    print("\n" + "=" * 50)
-    print("LATEX STATS TABLE")
-    print("=" * 50)
+def print_comprehensive_stats_table(all_results, rich_matrices):
+    print("\n" + "=" * 60)
+    print("UNIFIED LATEX RESULTS TABLE")
+    print("=" * 60)
 
     print(r"\begin{table*}[h]")
     print(r"\centering")
     print(r"\footnotesize")
-    print(r"\begin{tabular}{|l|l|c|c|c||c|}")
+    print(r"\renewcommand{\arraystretch}{1.2}")
+    print(r"\begin{tabular}{|l|l|l||c|c|c|c|}")
     print(r"\hline")
     print(
-        r"\textbf{Network} & \textbf{Metric} & \textbf{Mean} & \textbf{Min} & \textbf{Max} & \textbf{Random Equiv. (Mean)} \\"
+        r"\textbf{Network} & \textbf{Category} & \textbf{Metric} & \textbf{Mean} & \textbf{Min} & \textbf{Max} & \textbf{Rand (Mean)} \\"
     )
     print(r"\hline")
-
-    metrics_map = [
-        ("Avg Degree $\\langle k \\rangle$", "avg_degree", None),
-        ("Path Length $L$", "path_length", "path_length_rand"),
-        ("Clustering Coeff $C$", "clustering", "clustering_rand"),
-        ("Assortativity $r$", "assortativity", "assortativity_rand"),
-        ("Rich-Club $\\phi$", "rich_club", "rich_club_rand"),
-    ]
+    print(r"\hline")
 
     for name in all_results:
         res = all_results[name]
-        print(f"\\multirow{{5}}{{*}}{{\\textbf{{{name}}}}} ")
+        mat = rich_matrices.get(name)
 
-        for label, key, rand_key in metrics_map:
-            data = res[key]
-            mu = np.mean(data)
-            mn = np.min(data)
-            mx = np.max(data)
+        if mat is not None:
+            diffs = np.abs(np.diff(mat, axis=1))
+            turnover_per_step = np.sum(diffs, axis=0)
+            t_mean, t_min, t_max = (
+                np.mean(turnover_per_step),
+                np.min(turnover_per_step),
+                np.max(turnover_per_step),
+            )
+
+            durations = []
+            for r in range(mat.shape[0]):
+                row = mat[r, :]
+                count = 0
+                for val in row:
+                    if val == 1:
+                        count += 1
+                    elif count > 0:
+                        durations.append(count)
+                        count = 0
+                if count > 0:
+                    durations.append(count)
+
+            if durations:
+                res_mean, res_min, res_max = (
+                    np.mean(durations),
+                    np.min(durations),
+                    np.max(durations),
+                )
+            else:
+                res_mean, res_min, res_max = 0, 0, 0
+        else:
+            t_mean = t_min = t_max = res_mean = res_min = res_max = 0
+
+        rows = [
+            ("Topology", "Avg Degree $\\langle k \\rangle$", res["avg_degree"], None),
+            ("Topology", "Path Length $L$", res["path_length"], "path_length_rand"),
+            ("Topology", "Clustering $C$", res["clustering"], "clustering_rand"),
+            (
+                "Topology",
+                "Assortativity $r$",
+                res["assortativity"],
+                "assortativity_rand",
+            ),
+            ("Topology", "Rich-Club $\\phi$", res["rich_club"], "rich_club_rand"),
+            ("Stability", "Jaccard Index $J$", res["stability"], None),
+            ("Stability", "Kendall's Tau $\\tau$", res["kendall_tau"], None),
+            (
+                "Stability",
+                "Residence (min)",
+                (res_mean, res_min, res_max),
+                None,
+            ),
+            (
+                "Stability",
+                "Turnover (nodes/min)",
+                (t_mean, t_min, t_max),
+                None,
+            ),
+        ]
+
+        print(f"\\multirow{{{len(rows)}}}{{*}}{{\\textbf{{{name}}}}} ")
+
+        for i, (cat, label, data, rand_key) in enumerate(rows):
+            if isinstance(data, tuple):
+                mu, mn, mx = data
+            else:
+                mu = np.mean(data)
+                mn = np.min(data)
+                mx = np.max(data)
 
             if rand_key:
                 rand_data = res[rand_key]
-                rand_mu = np.mean(rand_data)
-                rand_str = f"{rand_mu:.3f}"
+                rand_str = f"{np.mean(rand_data):.3f}"
+            elif cat == "Stability":
+                rand_str = "n/a"
             else:
                 rand_str = "-"
 
-            print(f" & {label} & {mu:.3f} & {mn:.3f} & {mx:.3f} & {rand_str} \\\\")
+            cat_str = f"\\textbf{{{cat}}}" if (i == 0 or rows[i - 1][0] != cat) else ""
+            print(
+                f" & {cat_str} & {label} & {mu:.3f} & {mn:.3f} & {mx:.3f} & {rand_str} \\\\"
+            )
+            if i == 4:
+                print(r"\cline{2-7}")
 
         print(r"\hline")
 
     print(r"\end{tabular}")
-    print(r"\caption{Statistical comparison of Network Metrics vs. Random Null Models}")
-    print(r"\label{tab:network_stats}")
+    print(
+        r"\caption{Comprehensive comparison of Network Topology and Stability Metrics}"
+    )
+    print(r"\label{tab:full_results}")
     print(r"\end{table*}")
-    print("=" * 50 + "\n")
-
-
-def print_churn_statistics(rich_matrix, history, name):
-    diffs = np.abs(np.diff(rich_matrix, axis=1))
-    total_flips = np.sum(diffs)
-    avg_turnover = total_flips / rich_matrix.shape[1]
-
-    durations = []
-    for r in range(rich_matrix.shape[0]):
-        row = rich_matrix[r, :]
-        count = 0
-        for val in row:
-            if val == 1:
-                count += 1
-            elif count > 0:
-                durations.append(count)
-                count = 0
-        if count > 0:
-            durations.append(count)
-
-    avg_residence = np.mean(durations) if durations else 0
-    avg_jaccard = np.mean(history["stability"])
-    avg_tau = np.mean(history["kendall_tau"])
-
-    print(f"\n--- STABILITY STATISTICS: {name} ---")
-    print(f"Mean Jaccard Index:       {avg_jaccard:.3f}")
-    print(f"Mean Kendall's Tau:       {avg_tau:.3f}")
-    print(f"Avg Residence Time:       {avg_residence:.2f} mins")
-    print(f"Turnover Rate:            {avg_turnover:.2f} nodes/min")
-    print("--------------------------------------\n")
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":
     all_results = {}
+    rich_matrices = {}
     for name, conf in CONFIGS.items():
         print(f"\n--- STARTING ANALYSIS FOR: {name} ---")
         global ISL_RANGE_KM
@@ -311,6 +348,7 @@ if __name__ == "__main__":
         num_nodes = len(sats)
         num_steps = len(temporal_graphs)
         rich_matrix = np.zeros((num_nodes, num_steps))
+        rich_matrices[name] = rich_matrix
         mid_idx = len(temporal_graphs) // 2
         G_mid = temporal_graphs[mid_idx]
         minute_offset = results["time_steps"][mid_idx]
@@ -325,42 +363,76 @@ if __name__ == "__main__":
                 if deg >= cutoff:
                     rich_matrix[node, t_idx] = 1
 
-        print_churn_statistics(rich_matrix, results, name)
         perform_latitude_analysis(G_mid, sats, t_mid, name)
         plot_results.save_all_plots(temporal_graphs, results, name, sats, t_now)
 
     print("\nGenerating Comparison Plots...")
-
     plt.figure(figsize=(10, 6))
-    for name, res in all_results.items():
-        plt.plot(
-            res["time_steps"], res["rho"], label=name, color=CONFIGS[name]["color"]
-        )
+    plt.axhline(
+        1.0,
+        color="k",
+        linestyle="--",
+        alpha=0.5,
+        label="Random Baseline (No Rich Club)",
+    )
 
-    plt.axhline(1.0, color="k", linestyle="--", label="Random Baseline")
-    plt.title("Comparative Rich-Club: Starlink vs OneWeb")
-    plt.ylabel("Normalised Rich-Club Coefficient")
-    plt.xlabel("Time (min)")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.savefig("comparison_rho.png", dpi=300)
-
-    plt.figure(figsize=(10, 6))
     for name, res in all_results.items():
+        y_data = np.array(res["rho"])
+        mean_val = np.mean(y_data)
+        color = CONFIGS[name]["color"]
+
         plt.plot(
             res["time_steps"],
-            res["stability"],
-            label=name,
-            color=CONFIGS[name]["color"],
+            y_data,
+            label=rf"{name} (Mean $\rho$: {mean_val:.2f})",
+            color=color,
+            linewidth=2,
         )
 
-    plt.title("Comparative Stability: Starlink vs OneWeb")
-    plt.ylabel("Jaccard Index")
+        plt.axhline(mean_val, color=color, linestyle=":", alpha=0.7)
+
+    plt.annotate(
+        "Polar Convergence",
+        xy=(10, 2.5),
+        xytext=(25, 3.0),
+        arrowprops=dict(facecolor="black", arrowstyle="->"),
+        bbox=dict(boxstyle="round", fc="white", alpha=0.8),
+    )
+
+    plt.title("Comparative Rich-Club Coefficient: Starlink vs OneWeb")
+    plt.ylabel(r"Normalised Rich-Club Coefficient ($\rho$)")
     plt.xlabel("Time (min)")
-    plt.legend()
+    plt.legend(loc="upper right")
+    plt.grid(True, alpha=0.3)
+    plt.savefig("comparison_rho.png", dpi=300)
+    plt.close()
+
+    plt.figure(figsize=(10, 6))
+
+    for name, res in all_results.items():
+        y_data = np.array(res["stability"])
+        mean_val = np.mean(y_data)
+        color = CONFIGS[name]["color"]
+
+        plt.plot(
+            res["time_steps"],
+            y_data,
+            label=f"{name} (Mean J: {mean_val:.2f})",
+            color=color,
+            linewidth=2,
+        )
+
+        plt.axhline(mean_val, color=color, linestyle=":", alpha=0.7)
+
+    plt.title("Comparative Stability of Rich-Club Membership")
+    plt.ylabel("Stability (Jaccard Index)")
+    plt.xlabel("Time (min)")
+    plt.ylim(0, 1.1)
+    plt.legend(loc="lower right")
     plt.grid(True, alpha=0.3)
     plt.savefig("comparison_stability.png", dpi=300)
+    plt.close()
 
-    print("Comparison plots saved!")
-    print_comprehensive_stats_table(all_results)
+    print("Comparison plots saved with stats!")
+    print_comprehensive_stats_table(all_results, rich_matrices)
     print("Table generated!")
