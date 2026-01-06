@@ -2,6 +2,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import seaborn as sns
 from skyfield.api import wgs84
 
 
@@ -267,6 +268,97 @@ def plot_interactive_globe_full(G, satellites, t_now, filename="interactive.html
 
     fig.write_html(filename)
     print(f"Saved! Open '{filename}' in your web browser to interact.")
+
+
+def plot_latitude_degree_correlation(lats, degrees, name, filename):
+    plt.figure(figsize=(10, 6))
+    plt.hexbin(np.abs(lats), degrees, gridsize=30, cmap="inferno", mincnt=1)
+    plt.colorbar(label="Number of Satellites")
+
+    if "starlink" in name:
+        plt.axvline(53, color="cyan", linestyle="--", label="Orbital Inclination (53°)")
+    elif "oneweb" in name:
+        plt.axvline(
+            87.9, color="cyan", linestyle="--", label="Orbital Inclination (87.9°)"
+        )
+
+    plt.title(f"{name}: Correlation between Latitude and Node Degree")
+    plt.xlabel("Latitude (Absolute Degrees)")
+    plt.ylabel("Node Degree (k)")
+    plt.legend()
+    plt.grid(True, alpha=0.2)
+    plt.savefig(filename, dpi=300)
+    plt.close()
+    print(f"Saved {filename}")
+
+
+def plot_richness_heatmap(rich_matrix, name, filename):
+    plt.figure(figsize=(12, 8))
+    richness_sums = np.sum(rich_matrix, axis=1)
+    top_indices = np.argsort(richness_sums)[-50:]
+    subset_matrix = rich_matrix[top_indices, :]
+
+    sns.heatmap(
+        subset_matrix, cmap="Blues", cbar=False, xticklabels=10, yticklabels=False
+    )
+
+    plt.title(f"{name}: Stability of Rich-Club Membership (Top 50 Nodes)")
+    plt.xlabel("Time (min)")
+    plt.ylabel("Satellite ID (Sorted by Total Richness)")
+    plt.savefig(filename, dpi=300)
+    plt.close()
+    print(f"Saved {filename}")
+
+
+def plot_richness_barcode(rich_matrix, name, filename):
+    richness_sums = np.sum(rich_matrix, axis=1)
+    top_indices = np.argsort(richness_sums)[-30:]
+
+    plt.figure(figsize=(12, 6))
+    for i, node_idx in enumerate(top_indices):
+        times_rich = np.where(rich_matrix[node_idx, :] == 1)[0]
+        plt.hlines(
+            y=i,
+            xmin=min(times_rich),
+            xmax=max(times_rich),
+            linewidth=5,
+            color="navy",
+            alpha=0.7,
+        )
+
+    plt.yticks(range(30), [f"Sat {i}" for i in top_indices], fontsize=8)
+    plt.xlabel("Time (min)")
+    plt.ylabel("Satellite ID (Ranked by total time in Club)")
+    plt.title(f"{name}: Rich-Club Membership Duration")
+    plt.grid(axis="x", linestyle="--", alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300)
+    plt.close()
+
+
+def plot_residence_time_hist(rich_matrix, name, filename):
+    durations = []
+    rows, cols = rich_matrix.shape
+
+    for r in range(rows):
+        row = rich_matrix[r, :]
+        count = 0
+        for val in row:
+            if val == 1:
+                count += 1
+            elif count > 0:
+                durations.append(count)
+                count = 0
+        if count > 0:
+            durations.append(count)
+
+    plt.figure(figsize=(8, 5))
+    plt.hist(durations, bins=20, color="teal", edgecolor="black", alpha=0.7)
+    plt.xlabel("Duration of Membership (min)")
+    plt.ylabel("Frequency")
+    plt.title(f"{name}: How long do satellites stay in the Rich Club?")
+    plt.savefig(filename, dpi=300)
+    plt.close()
 
 
 def save_all_plots(temporal_graphs, results, name, sats, t_now):
