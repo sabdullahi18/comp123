@@ -2,156 +2,304 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-import seaborn as sns
 from skyfield.api import wgs84
+from scipy.signal import find_peaks
+from scipy.stats import poisson
 
 
-def plot_degree_distribution(G, filename="degree_distribution.png"):
+def plot_degree_distribution(G, name, filename="degree_distribution.png"):
     degrees = [d for n, d in G.degree()]
-    if not degrees:
-        return
-
     avg_deg = np.mean(degrees)
+    plt.figure(figsize=(10, 6))
 
-    plt.figure(figsize=(8, 5))
     plt.hist(
         degrees,
-        bins=range(int(min(degrees)), int(max(degrees)) + 2),
+        bins=range(min(degrees), max(degrees) + 1),
+        density=True,
         color="skyblue",
         edgecolor="black",
-        rwidth=0.8,
-        label="Node Count",
+        alpha=0.7,
+        label=f"{name} Degree Freq",
     )
+
+    x_range = np.arange(min(degrees), max(degrees) + 1)
+    y_poisson = poisson.pmf(x_range, avg_deg)
+    plt.plot(x_range, y_poisson, "r--", linewidth=2.5, label="Random Graph (Poisson)")
+
     plt.axvline(
         avg_deg,
-        color="red",
+        color="navy",
         linestyle="dashed",
         linewidth=2,
-        label=f"Avg Degree: {avg_deg:.2f}",
+        label=f"Mean: {avg_deg:.2f}",
     )
 
-    plt.title(f"Degree Distribution (N={len(G.nodes)})")
-    plt.xlabel("Degree")
-    plt.ylabel("Frequency")
+    plt.title(f"{name}: Degree Distribution vs. Random Null Model")
+    plt.xlabel(r"Degree ($k$)")
+    plt.ylabel("Probability / Frequency")
     plt.legend()
     plt.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
     plt.savefig(filename, dpi=300)
     plt.close()
     print(f"Saved {filename}")
 
 
-def plot_path_length(results, filename="path_length.png"):
-    plt.figure(figsize=(8, 5))
-    plt.plot(results["time_steps"], results["path_length"], color="purple", linewidth=2)
-    plt.title("Avg Shortest Path")
-    plt.ylabel("Avg Path Length")
-    plt.xlabel("Time (Minutes)")
-    plt.grid(True, alpha=0.3)
-    plt.savefig(filename, dpi=300)
-    plt.close()
-    print(f"Saved {filename}")
+def plot_path_length(results, name, filename="path_length.png"):
+    plt.figure(figsize=(10, 6))
+    x = np.array(results["time_steps"])
+    y_real = np.array(results["path_length"])
+    y_rand = np.array(results.get("path_length_rand", [0] * len(x)))
 
-
-def plot_clustering(results, filename="clustering.png"):
-    plt.figure(figsize=(8, 5))
-    plt.plot(results["time_steps"], results["clustering"], color="orange", linewidth=2)
-    plt.title("Avg Clustering Coefficient")
-    plt.ylabel("Clustering Coefficient")
-    plt.xlabel("Time (Minutes)")
-    plt.grid(True, alpha=0.3)
-    plt.savefig(filename, dpi=300)
-    plt.close()
-    print(f"Saved {filename}")
-
-
-def plot_assortativity(results, filename="assortativity.png"):
-    plt.figure(figsize=(8, 5))
-    plt.plot(results["time_steps"], results["assortativity"], color="teal", linewidth=2)
-    plt.axhline(0, color="black", linestyle="--", alpha=0.5, label="Neutral")
-    plt.title("Degree Assortativity")
-    plt.ylabel("Assortativity")
-    plt.xlabel("Time (Minutes)")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.savefig(filename, dpi=300)
-    plt.close()
-    print(f"Saved {filename}")
-
-
-def plot_avg_degree(results, filename="avg_degree.png"):
-    plt.figure(figsize=(8, 5))
-    plt.plot(results["time_steps"], results["avg_degree"], color="blue", linewidth=2)
-    plt.title("Average Degree")
-    plt.ylabel("Average Degree")
-    plt.xlabel("Time (Minutes)")
-    plt.grid(True, alpha=0.3)
-    plt.savefig(filename, dpi=300)
-    plt.close()
-    print(f"Saved {filename}")
-
-
-def plot_rich_club_rho(results, filename="rich_club_rho.png"):
-    plt.figure(figsize=(8, 5))
     plt.plot(
-        results["time_steps"], results["rho"], color="#d62728", marker="o", markersize=3
+        x,
+        y_rand,
+        color="grey",
+        linestyle="--",
+        alpha=0.6,
+        label="Random Graph (Theoretical Limit)",
+        linewidth=1.5,
     )
-    plt.axhline(1.0, color="k", linestyle="--", label="Random Baseline (No Rich Club)")
 
-    plt.title("Rich-Club Existence (Normalised)")
-    plt.ylabel("Norm. Rich-Club Coefficient")
-    plt.xlabel("Time (Minutes)")
-    plt.legend()
+    plt.plot(x, y_real, color="purple", linewidth=2.5, label=f"{name} (Empirical)")
+    mean_val = np.mean(y_real)
+    plt.axhline(
+        mean_val,
+        color="indigo",
+        linestyle=":",
+        linewidth=2,
+        label=f"Mean: {mean_val:.2f}",
+    )
+    mid_idx = len(x) // 2
+    x_pos = x[mid_idx]
+    y_r = y_real[mid_idx]
+    y_null = y_rand[mid_idx]
+    gap = y_r - y_null
+    plt.annotate(
+        f"Overhead: +{gap:.1f} hops",
+        xy=(x_pos, y_null),
+        xytext=(x_pos, y_r),
+        arrowprops=dict(arrowstyle="<->", color="black", lw=1.5, shrinkA=0, shrinkB=0),
+        ha="center",
+        va="center",
+        fontsize=10,
+        bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.9, edgecolor="white"),
+    )
+
+    plt.title(f"{name}: Average Shortest Path Length")
+    plt.ylabel(r"Avg Path Length ($L$)")
+    plt.xlabel("Time (min)")
+    plt.legend(loc="center right")
     plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
     plt.savefig(filename, dpi=300)
     plt.close()
     print(f"Saved {filename}")
 
 
-def plot_stability(results, filename="stability.png"):
-    plt.figure(figsize=(8, 5))
+def plot_clustering(results, name, filename="clustering.png"):
+    plt.figure(figsize=(10, 6))
+    x = np.array(results["time_steps"])
+    y_real = np.array(results["clustering"])
+    y_rand = np.array(results.get("clustering_rand", [0] * len(x)))
+
     plt.plot(
-        results["time_steps"],
-        results["stability"],
-        color="#2ca02c",
-        marker="s",
-        markersize=3,
+        x,
+        y_rand,
+        color="grey",
+        linestyle="--",
+        alpha=0.6,
+        label="Random Null Model",
+        linewidth=1.5,
     )
-    plt.title("Rich-Club Stability")
-    plt.ylabel("Jaccard Index")
-    plt.xlabel("Time (Minutes)")
-    plt.ylim(0, 1.1)
+
+    plt.plot(x, y_real, color="orange", linewidth=2.5, label=f"{name} (Empirical)")
+    slope, intercept = np.polyfit(x, y_real, 1)
+    trend_line = slope * x + intercept
+    plt.plot(
+        x,
+        trend_line,
+        color="darkred",
+        linestyle=":",
+        linewidth=2,
+        label=f"Linear Trend (Slope: {slope:.2e})",
+    )
+
+    mid_idx = len(x) // 2
+    gap_size = y_real[mid_idx] - y_rand[mid_idx]
+
+    plt.annotate(
+        rf"Small-World Gap ($\Delta C \approx ${gap_size:.2f})",
+        xy=(x[mid_idx], (y_real[mid_idx] + y_rand[mid_idx]) / 2),
+        xytext=(x[mid_idx] + 10, (y_real[mid_idx] + y_rand[mid_idx]) / 2),
+        arrowprops=dict(facecolor="black", arrowstyle="-["),
+        fontsize=9,
+        color="black",
+        ha="left",
+        va="center",
+    )
+
+    plt.title(f"{name}: Clustering Coefficient")
+    plt.ylabel(r"Avg Clustering Coefficient ($C$)")
+    plt.xlabel("Time (min)")
+    plt.legend(loc="lower right")
     plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
     plt.savefig(filename, dpi=300)
     plt.close()
     print(f"Saved {filename}")
 
 
-def plot_rich_club_curve(G, filename="rich_club_curve.png"):
+def plot_assortativity(results, name, filename="assortativity.png"):
+    plt.figure(figsize=(10, 6))
+    x = np.array(results["time_steps"])
+    y_real = np.array(results["assortativity"])
+    y_rand = np.array(results.get("assortativity_rand", [0] * len(x)))
+
+    plt.plot(
+        x,
+        y_rand,
+        color="grey",
+        linestyle="--",
+        alpha=0.6,
+        label="Random Null Model",
+        linewidth=1.5,
+    )
+
+    plt.plot(x, y_real, color="teal", linewidth=2.5, label=f"{name} (Empirical)")
+    slope, intercept = np.polyfit(x, y_real, 1)
+    trend_line = slope * x + intercept
+
+    plt.plot(
+        x,
+        trend_line,
+        color="darkorange",
+        linestyle=":",
+        linewidth=2,
+        label=f"Linear Trend (Slope: {slope:.2e})",
+    )
+
+    plt.axhline(0, color="black", linewidth=1, alpha=0.4)
+    plt.text(x[0], 0.02, "Neutral Mixing (r=0)", fontsize=8, color="black", alpha=0.6)
+    plt.title(f"{name}: Degree Assortativity")
+    plt.ylabel(r"Assortativity Coefficient ($r$)")
+    plt.xlabel("Time (min)")
+    plt.legend(loc="center right")
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300)
+    plt.close()
+    print(f"Saved {filename}")
+
+
+def plot_avg_degree(results, name, filename="avg_degree.png"):
+    plt.figure(figsize=(10, 6))
+    x = np.array(results["time_steps"])
+    y = np.array(results["avg_degree"])
+    plt.plot(x, y, color="navy", linewidth=2, label=r"Avg Degree $\langle k \rangle$")
+
+    global_mean = np.mean(y)
+    plt.axhline(
+        global_mean,
+        color="red",
+        linestyle="--",
+        alpha=0.7,
+        label=f"Global Mean: {global_mean:.2f}",
+    )
+
+    peaks, _ = find_peaks(y, height=global_mean + 0.5, distance=10)
+    plt.plot(x[peaks], y[peaks], "rx")
+
+    for p in peaks:
+        plt.annotate(
+            "Polar\nRegion",
+            xy=(x[p], y[p]),
+            xytext=(x[p], y[p] + 0.5),
+            arrowprops=dict(facecolor="black", arrowstyle="->"),
+            ha="center",
+            fontsize=9,
+        )
+
+    plt.title(f"{name}: Average Degree")
+    plt.ylabel(r"Average Degree $\langle k \rangle$")
+    plt.xlabel("Time (min)")
+    plt.legend(loc="lower right")
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300)
+    plt.close()
+    print(f"Saved {filename}")
+
+
+def plot_rich_club_curve(G, name, filename="rich_club_curve.png"):
     rc = nx.rich_club_coefficient(G, normalized=False)
     degrees = [d for n, d in G.degree()]
-    G_rand = nx.configuration_model(degrees, create_using=nx.Graph)
-    G_rand.remove_edges_from(nx.selfloop_edges(G_rand))
+    G_rand = nx.expected_degree_graph(degrees, selfloops=False)
     rc_rand = nx.rich_club_coefficient(G_rand, normalized=False)
 
     rhos = []
     ks = sorted(list(rc.keys()))
+    clean_ks = []
+    deg_array = np.array(degrees)
 
     for k in ks:
+        if np.sum(deg_array > k) < 5:
+            continue
+
         phi_real = rc[k]
         phi_rand = rc_rand.get(k, 0)
+
         if phi_rand > 0:
             rhos.append(phi_real / phi_rand)
-        else:
-            rhos.append(0)
+            clean_ks.append(k)
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(ks, rhos, marker="o", color="purple")
-    plt.axhline(1.0, color="k", linestyle="--", label="Random Baseline")
-    plt.xlabel("Degree k")
-    plt.ylabel("Normalized Rich-Club Coefficient")
-    plt.title("Rich-Club Curve at T=0")
+    plt.figure(figsize=(9, 6))
+    plt.axhline(1.0, color="grey", linestyle="--", label="Random Baseline")
+
+    plt.plot(
+        clean_ks,
+        rhos,
+        marker="o",
+        markersize=4,
+        color="purple",
+        linewidth=2,
+        label=f"{name} Rich-Club",
+    )
+
+    rich_indices = [i for i, r in enumerate(rhos) if r > 1.05]
+    if rich_indices:
+        start_k = clean_ks[rich_indices[0]]
+        end_k = clean_ks[rich_indices[-1]]
+        plt.axvspan(
+            start_k,
+            end_k,
+            color="purple",
+            alpha=0.1,
+            label=f"Rich Region (k > {start_k})",
+        )
+
+        max_rho = max(rhos)
+        max_k = clean_ks[np.argmax(rhos)]
+        plt.annotate(
+            f"Peak: {max_rho:.2f}",
+            xy=(max_k, max_rho),
+            xytext=(max_k, max_rho + 0.2),
+            arrowprops=dict(facecolor="black", shrink=0.05),
+            ha="center",
+        )
+
+    plt.xlabel("Degree Threshold ($k$)")
+    plt.ylabel(r"Norm Rich-Club Coefficient $\rho$")
+    plt.title(f"{name}: Rich-Club Profile at T=0 (Structural Cutoff at N<5)")
     plt.legend()
     plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
     plt.savefig(filename, dpi=300)
     plt.close()
     print(f"Saved {filename}")
@@ -292,88 +440,28 @@ def plot_latitude_degree_correlation(lats, degrees, name, filename):
     print(f"Saved {filename}")
 
 
-def plot_richness_heatmap(rich_matrix, name, filename):
-    plt.figure(figsize=(12, 8))
-    richness_sums = np.sum(rich_matrix, axis=1)
-    top_indices = np.argsort(richness_sums)[-50:]
-    subset_matrix = rich_matrix[top_indices, :]
-
-    sns.heatmap(
-        subset_matrix, cmap="Blues", cbar=False, xticklabels=10, yticklabels=False
-    )
-
-    plt.title(f"{name}: Stability of Rich-Club Membership (Top 50 Nodes)")
-    plt.xlabel("Time (min)")
-    plt.ylabel("Satellite ID (Sorted by Total Richness)")
-    plt.savefig(filename, dpi=300)
-    plt.close()
-    print(f"Saved {filename}")
-
-
-def plot_richness_barcode(rich_matrix, name, filename):
-    richness_sums = np.sum(rich_matrix, axis=1)
-    top_indices = np.argsort(richness_sums)[-30:]
-
-    plt.figure(figsize=(12, 6))
-    for i, node_idx in enumerate(top_indices):
-        times_rich = np.where(rich_matrix[node_idx, :] == 1)[0]
-        plt.hlines(
-            y=i,
-            xmin=min(times_rich),
-            xmax=max(times_rich),
-            linewidth=5,
-            color="navy",
-            alpha=0.7,
-        )
-
-    plt.yticks(range(30), [f"Sat {i}" for i in top_indices], fontsize=8)
-    plt.xlabel("Time (min)")
-    plt.ylabel("Satellite ID (Ranked by total time in Club)")
-    plt.title(f"{name}: Rich-Club Membership Duration")
-    plt.grid(axis="x", linestyle="--", alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300)
-    plt.close()
-
-
-def plot_residence_time_hist(rich_matrix, name, filename):
-    durations = []
-    rows, cols = rich_matrix.shape
-
-    for r in range(rows):
-        row = rich_matrix[r, :]
-        count = 0
-        for val in row:
-            if val == 1:
-                count += 1
-            elif count > 0:
-                durations.append(count)
-                count = 0
-        if count > 0:
-            durations.append(count)
-
-    plt.figure(figsize=(8, 5))
-    plt.hist(durations, bins=20, color="teal", edgecolor="black", alpha=0.7)
-    plt.xlabel("Duration of Membership (min)")
-    plt.ylabel("Frequency")
-    plt.title(f"{name}: How long do satellites stay in the Rich Club?")
-    plt.savefig(filename, dpi=300)
-    plt.close()
-
-
 def save_all_plots(temporal_graphs, results, name, sats, t_now):
     print("Generating individual plots...")
     plot_degree_distribution(
-        temporal_graphs[0], f"{name}/{name}-degree-distribution.png"
+        temporal_graphs[0],
+        name,
+        f"{name.lower()}/{name.lower()}-degree-distribution.png",
     )
-    plot_path_length(results, f"{name}/{name}-path-length.png")
-    plot_clustering(results, f"{name}/{name}-clustering.png")
-    plot_assortativity(results, f"{name}/{name}-assortativity.png")
-    plot_rich_club_rho(results, f"{name}/{name}-rich-club-rho.png")
-    plot_stability(results, f"{name}/{name}-stability.png")
-    plot_avg_degree(results, f"{name}/{name}-avg-degree.png")
-    plot_rich_club_curve(temporal_graphs[0], f"{name}/{name}-rich-club-curve.png")
-    export_to_gephi(temporal_graphs[0], sats, t_now, f"{name}/{name}-gephi.gexf")
+    plot_path_length(results, name, f"{name.lower()}/{name.lower()}-path-length.png")
+    plot_clustering(results, name, f"{name.lower()}/{name.lower()}-clustering.png")
+    plot_assortativity(
+        results, name, f"{name.lower()}/{name.lower()}-assortativity.png"
+    )
+    plot_avg_degree(results, name, f"{name.lower()}/{name.lower()}-avg-degree.png")
+    plot_rich_club_curve(
+        temporal_graphs[0], name, f"{name.lower()}/{name.lower()}-rich-club-curve.png"
+    )
+    export_to_gephi(
+        temporal_graphs[0], sats, t_now, f"{name.lower()}/{name.lower()}-gephi.gexf"
+    )
     plot_interactive_globe_full(
-        temporal_graphs[0], sats, t_now, f"{name}/{name}-interactive.html"
+        temporal_graphs[0],
+        sats,
+        t_now,
+        f"{name.lower()}/{name.lower()}-interactive.html",
     )

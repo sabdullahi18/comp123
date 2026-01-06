@@ -12,7 +12,7 @@ DURATION_MINUTES = 95
 TIME_STEP_MIN = 1
 
 CONFIGS = {
-    # "starlink": {
+    # "Starlink": {
     #     "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",
     #     "alt_min": 530,
     #     "alt_max": 580,
@@ -20,7 +20,7 @@ CONFIGS = {
     #     "isl_range": 1200,
     #     "color": "pink",
     # },
-    "oneweb": {
+    "OneWeb": {
         "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=oneweb&FORMAT=tle",
         "alt_min": 1150,
         "alt_max": 1250,
@@ -205,30 +205,10 @@ def perform_latitude_analysis(G, satellites, t_mid, name):
             lats.append(geo.latitude.degrees)
             degs.append(G.degree(i))
     plot_results.plot_latitude_degree_correlation(
-        lats, degs, name, f"{name}/{name}-latitude-degree-correlation.png"
-    )
-
-
-def perform_richness_heatmap(temporal_graphs, satellites, name):
-    print("Generating richness heatmap...")
-    num_nodes = len(sats)
-    num_steps = len(temporal_graphs)
-    rich_matrix = np.zeros((num_nodes, num_steps))
-
-    for t_idx, G in enumerate(temporal_graphs):
-        degrees = dict(G.degree())
-        if not degrees:
-            continue
-
-        deg_values = sorted(degrees.values())
-        cutoff = np.percentile(deg_values, 95)
-
-        for node, deg in degrees.items():
-            if deg >= cutoff:
-                rich_matrix[node, t_idx] = 1
-
-    plot_results.plot_richness_heatmap(
-        rich_matrix, name, f"{name}/{name}-richness-heatmap.png"
+        lats,
+        degs,
+        name,
+        f"{name.lower()}/{name.lower()}-latitude-degree-correlation.png",
     )
 
 
@@ -255,10 +235,7 @@ def print_comprehensive_stats_table(all_results):
         ("Rich-Club $\\phi$", "rich_club", "rich_club_rand"),
     ]
 
-    for name in ["starlink", "oneweb"]:
-        if name not in all_results:
-            continue
-
+    for name in all_results:
         res = all_results[name]
         print(f"\\multirow{{5}}{{*}}{{\\textbf{{{name}}}}} ")
 
@@ -305,7 +282,6 @@ def print_churn_statistics(rich_matrix, history, name):
             durations.append(count)
 
     avg_residence = np.mean(durations) if durations else 0
-
     avg_jaccard = np.mean(history["stability"])
     avg_tau = np.mean(history["kendall_tau"])
 
@@ -349,15 +325,6 @@ if __name__ == "__main__":
                 if deg >= cutoff:
                     rich_matrix[node, t_idx] = 1
 
-        plot_results.plot_richness_heatmap(
-            rich_matrix, name, f"{name}/{name}-richness-heatmap.png"
-        )
-        plot_results.plot_richness_barcode(
-            rich_matrix, name, f"{name}/{name}-barcode.png"
-        )
-        plot_results.plot_residence_time_hist(
-            rich_matrix, name, f"{name}/{name}-residence-hist.png"
-        )
         print_churn_statistics(rich_matrix, results, name)
         perform_latitude_analysis(G_mid, sats, t_mid, name)
         plot_results.save_all_plots(temporal_graphs, results, name, sats, t_now)
