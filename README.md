@@ -17,7 +17,7 @@ This repo contains the simulation framework, analysis code, and results for a st
 The simulation requires Python 3.8+ and the following scientific computing libraries:
 
 ```bash
-pip install numpy networkx matplotlib plotly skyfield scipy tqdm
+pip install -r requirements.txt 
 
 ```
 
