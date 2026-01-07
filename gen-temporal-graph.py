@@ -354,6 +354,9 @@ if __name__ == "__main__":
         num_steps = len(temporal_graphs)
         rich_matrix = np.zeros((num_nodes, num_steps))
         rich_matrices[name] = rich_matrix
+        G0 = temporal_graphs[0]
+        degrees_0 = [d for n, d in G0.degree()]
+        cutoff = np.percentile(degrees_0, 90)
         mid_idx = len(temporal_graphs) // 2
         G_mid = temporal_graphs[mid_idx]
         minute_offset = results["time_steps"][mid_idx]
@@ -363,7 +366,6 @@ if __name__ == "__main__":
             degrees = dict(G.degree())
             if not degrees:
                 continue
-            cutoff = np.percentile(list(degrees.values()), 95)
             for node, deg in degrees.items():
                 if deg >= cutoff:
                     rich_matrix[node, t_idx] = 1
@@ -429,6 +431,7 @@ if __name__ == "__main__":
     plt.grid(True, alpha=0.3)
     plt.savefig("comparison_stability.png", dpi=300)
     plt.close()
+    plot_results.plot_combined_stability_metrics(all_results)
 
     print("Comparison plots saved with stats!")
     print_comprehensive_stats_table(all_results, rich_matrices)

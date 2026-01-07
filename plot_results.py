@@ -349,8 +349,9 @@ def plot_interactive_globe_full(G, satellites, t_now, filename="interactive.html
             lat1, lon1 = node_positions[u]
             lat2, lon2 = node_positions[v]
 
-            edge_lats.extend([lat1, lat2, None])
-            edge_lons.extend([lon1, lon2, None])
+            if abs(lon1 - lon2) < 180:
+                edge_lats.extend([lat1, lat2, None])
+                edge_lons.extend([lon1, lon2, None])
 
     fig = go.Figure()
     fig.add_trace(
@@ -426,6 +427,60 @@ def plot_latitude_degree_correlation(lats, degrees, name, filename):
     print(f"Saved {filename}")
 
 
+def plot_combined_stability_metrics(
+    all_results, filename="combined_stability_metrics.png"
+):
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
+    styles = {"Starlink": "-", "OneWeb": "--"}
+
+    for name, res in all_results.items():
+        time = res["time_steps"]
+        if name == "Starlink":
+            c = "pink"
+        elif name == "OneWeb":
+            c = "purple"
+        else:
+            c = "blue"
+
+        s = styles.get(name, "-")
+        ax1.plot(
+            time, res["path_length"], label=f"{name}", color=c, linestyle=s, linewidth=2
+        )
+
+        ax2.plot(
+            time, res["clustering"], label=f"{name}", color=c, linestyle=s, linewidth=2
+        )
+
+        ax3.plot(
+            time,
+            res["assortativity"],
+            label=f"{name}",
+            color=c,
+            linestyle=s,
+            linewidth=2,
+        )
+
+    ax1.set_ylabel(r"Avg Path Length ($L$)")
+    ax1.set_title("A. Global Efficiency (Path Length)")
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc="upper right")
+
+    ax2.set_ylabel(r"Clustering Coeff ($C$)")
+    ax2.set_title("B. Local Redundancy (Clustering)")
+    ax2.grid(True, alpha=0.3)
+
+    ax3.set_ylabel(r"Assortativity ($r$)")
+    ax3.set_title("C. Core Structure (Assortativity)")
+    ax3.grid(True, alpha=0.3)
+    ax3.set_xlabel("Time (min)")
+
+    ax3.axhline(0, color="gray", linestyle=":", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300)
+    plt.close()
+    print(f"Saved combined plot to {filename}")
+
+
 def save_all_plots(temporal_graphs, results, name, sats, t_now):
     print("Generating individual plots...")
     plot_degree_distribution(
@@ -433,11 +488,11 @@ def save_all_plots(temporal_graphs, results, name, sats, t_now):
         name,
         f"{name.lower()}/{name.lower()}-degree-distribution.png",
     )
-    plot_path_length(results, name, f"{name.lower()}/{name.lower()}-path-length.png")
-    plot_clustering(results, name, f"{name.lower()}/{name.lower()}-clustering.png")
-    plot_assortativity(
-        results, name, f"{name.lower()}/{name.lower()}-assortativity.png"
-    )
+    # plot_path_length(results, name, f"{name.lower()}/{name.lower()}-path-length.png")
+    # plot_clustering(results, name, f"{name.lower()}/{name.lower()}-clustering.png")
+    # plot_assortativity(
+    #     results, name, f"{name.lower()}/{name.lower()}-assortativity.png"
+    # )
     plot_avg_degree(results, name, f"{name.lower()}/{name.lower()}-avg-degree.png")
     plot_rich_club_curve(
         temporal_graphs[0], name, f"{name.lower()}/{name.lower()}-rich-club-curve.png"
