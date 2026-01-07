@@ -47,7 +47,7 @@ def fetch_satellite_data(config):
             height_km = subpoint.elevation.km
 
             if config["alt_min"] < height_km < config["alt_max"]:
-                if "Starlink" in config["url"] and abs(subpoint.latitude.degrees) > 54:
+                if "starlink" in config["url"] and abs(subpoint.latitude.degrees) > 54:
                     continue
                 subset.append(sat)
         except Exception as _:
