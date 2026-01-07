@@ -14,7 +14,7 @@ This repo contains the simulation framework, analysis code, and results for a st
 
 ### Prerequisites
 
-The simulation requires Python 3.8+ and the following scientific computing libraries:
+The simulation requires Python 3.8+:
 
 ```bash
 pip install -r requirements.txt 
