@@ -3,7 +3,6 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from skyfield.api import wgs84
-from scipy.signal import find_peaks
 from scipy.stats import poisson
 
 
@@ -210,19 +209,6 @@ def plot_avg_degree(results, name, filename="avg_degree.png"):
         alpha=0.7,
         label=f"Global Mean: {global_mean:.2f}",
     )
-
-    peaks, _ = find_peaks(y, height=global_mean + 0.5, distance=10)
-    plt.plot(x[peaks], y[peaks], "rx")
-
-    for p in peaks:
-        plt.annotate(
-            "Polar\nRegion",
-            xy=(x[p], y[p]),
-            xytext=(x[p], y[p] + 0.5),
-            arrowprops=dict(facecolor="black", arrowstyle="->"),
-            ha="center",
-            fontsize=9,
-        )
 
     plt.title(f"{name}: Average Degree")
     plt.ylabel(r"Average Degree $\langle k \rangle$")

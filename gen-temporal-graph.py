@@ -47,6 +47,8 @@ def fetch_satellite_data(config):
             height_km = subpoint.elevation.km
 
             if config["alt_min"] < height_km < config["alt_max"]:
+                if "Starlink" in config["url"] and abs(subpoint.latitude.degrees) > 54:
+                    continue
                 subset.append(sat)
         except Exception as _:
             continue
@@ -143,8 +145,12 @@ def calculate_basic_metrics(temporal_graphs):
         "kendall_tau": [],
     }
 
+    G0 = temporal_graphs[0]
+    degrees_0 = [d for n, d in G0.degree()]
+    k_thresh = get_dynamic_threshold(G0, degrees_0)
     prev_rich_nodes = set()
     degrees_prev = []
+
     for t, G in enumerate(
         tqdm(temporal_graphs, desc="Processing snapshots", unit="step")
     ):
@@ -168,7 +174,6 @@ def calculate_basic_metrics(temporal_graphs):
         except Exception as _:
             history["assortativity"].append(0)
 
-        k_thresh = get_dynamic_threshold(G, degrees)
         rc = nx.rich_club_coefficient(G, normalized=False)
         phi_real = rc.get(int(k_thresh), 0)
         history["rich_club"].append(phi_real)
@@ -390,14 +395,6 @@ if __name__ == "__main__":
         )
 
         plt.axhline(mean_val, color=color, linestyle=":", alpha=0.7)
-
-    plt.annotate(
-        "Polar Convergence",
-        xy=(10, 2.5),
-        xytext=(25, 3.0),
-        arrowprops=dict(facecolor="black", arrowstyle="->"),
-        bbox=dict(boxstyle="round", fc="white", alpha=0.8),
-    )
 
     plt.title("Comparative Rich-Club Coefficient: Starlink vs OneWeb")
     plt.ylabel(r"Normalised Rich-Club Coefficient ($\rho$)")
