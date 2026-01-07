@@ -423,9 +423,9 @@ def plot_latitude_degree_correlation(lats, degrees, name, filename):
     plt.hexbin(np.abs(lats), degrees, gridsize=30, cmap="inferno", mincnt=1)
     plt.colorbar(label="Number of Satellites")
 
-    if "starlink" in name:
+    if "Starlink" in name:
         plt.axvline(53, color="cyan", linestyle="--", label="Orbital Inclination (53°)")
-    elif "oneweb" in name:
+    elif "OneWeb" in name:
         plt.axvline(
             87.9, color="cyan", linestyle="--", label="Orbital Inclination (87.9°)"
         )
