@@ -2,6 +2,9 @@
 
 This repo contains the simulation framework, analysis code, and results for a study investigating the characteristics, mainly the topological stability, of Low Earth Orbit (LEO) mega-constellations. Specifically, this project compares the **Walker-Delta (Starlink)** and **Walker-Star (OneWeb)** architectures to determine their [rich-club](https://doi.org/10.48550/arXiv.cs/0308036) status over time.
 
+![oneweb](oneweb/newplot.png)
+![starlink](starlink/newplot.png)
+
 ## Structure
 
 * **`gen-temporal-graph.py`**: The main simulation engine. Fetches TLE data, propagates orbits, builds temporal graphs, and calculates network metrics
