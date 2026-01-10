@@ -482,17 +482,14 @@ def plot_combined_stability_metrics(
 
 
 def save_all_plots(temporal_graphs, results, name, sats, t_now):
-    print("Generating individual plots...")
+    print(
+        "Generating individual plots for degree distribution, average degree, rich club curve, Gephi, and interactive globe..."
+    )
     plot_degree_distribution(
         temporal_graphs[0],
         name,
         f"{name.lower()}/{name.lower()}-degree-distribution.png",
     )
-    # plot_path_length(results, name, f"{name.lower()}/{name.lower()}-path-length.png")
-    # plot_clustering(results, name, f"{name.lower()}/{name.lower()}-clustering.png")
-    # plot_assortativity(
-    #     results, name, f"{name.lower()}/{name.lower()}-assortativity.png"
-    # )
     plot_avg_degree(results, name, f"{name.lower()}/{name.lower()}-avg-degree.png")
     plot_rich_club_curve(
         temporal_graphs[0], name, f"{name.lower()}/{name.lower()}-rich-club-curve.png"
